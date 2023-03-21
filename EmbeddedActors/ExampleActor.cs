@@ -34,7 +34,7 @@ namespace EmbeddedActors
         public void On(TestEvent evt) => _sum += evt.Number;
 
         public Task<int> Handle(TestQuery query) => Task.FromResult(_sum);
-        
+
         public override void Initialise()
         {
             // load your state

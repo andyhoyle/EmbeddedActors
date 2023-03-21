@@ -26,15 +26,16 @@ namespace EmbeddedActors
         public async Task Tell(Command<T> command)
         {
             await Activate();
-            var events = Dispatcher<T>.Dispatch(_actor, command);
+            System.Collections.Generic.IEnumerable<Event> events = Dispatcher<T>.Dispatch(_actor, command);
 
-            events.ForEach(e => {
+            events.ForEach(e =>
+            {
                 Dispatcher<T>.Dispatch(_actor, e);
                 _actor.Stream.OnNext(e);
             });
         }
 
-        public async Task<U> Ask<U>(Query<T,U> query)
+        public async Task<U> Ask<U>(Query<T, U> query)
         {
             await Activate();
             return await Dispatcher<T>.Dispatch<U>(_actor, query);
@@ -42,7 +43,7 @@ namespace EmbeddedActors
 
         private Task Activate()
         {
-            if(_actor == null)
+            if (_actor == null)
             {
                 _actor = (T)Activator.CreateInstance(typeof(T), _id);
                 _actor.Initialise();

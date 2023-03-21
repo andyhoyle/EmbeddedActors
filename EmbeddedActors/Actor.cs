@@ -2,7 +2,7 @@
 
 namespace EmbeddedActors
 {
-    public abstract class Actor 
+    public abstract class Actor
     {
         public readonly string Id;
 

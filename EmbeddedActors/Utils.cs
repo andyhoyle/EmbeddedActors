@@ -13,9 +13,8 @@ namespace EmbeddedActors
             {
                 return assembly.DefinedTypes;
             }
-            catch (ReflectionTypeLoadException e)
+            catch (ReflectionTypeLoadException)
             {
-                
                 return null;
             }
         }
@@ -24,7 +23,7 @@ namespace EmbeddedActors
         {
             int i = 0;
 
-            foreach (var kvp in dict)
+            foreach (KeyValuePair<K, V> kvp in dict)
             {
                 action(kvp.Key, kvp.Value, i++);
             }
@@ -39,7 +38,7 @@ namespace EmbeddedActors
         {
             int i = 0;
 
-            foreach (var item in enumeration)
+            foreach (K item in enumeration)
             {
                 action(item, i++);
             }
@@ -49,7 +48,6 @@ namespace EmbeddedActors
         {
             enumeration.ForEach((s, i) => action(s));
         }
-
 
         public static TResult Find<TKey, TResult>(this IDictionary<TKey, TResult> dictionary, TKey key) where TResult : class
         {

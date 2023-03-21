@@ -10,7 +10,7 @@ namespace EmbeddedActors
     public static class Dispatcher<T> where T : Actor
     {
         private static Type _type;
-        
+
         static readonly string[] conventions = { "On", "Handle" };
 
         readonly static Dictionary<Type, Func<Actor, Command<T>, IEnumerable<Event>>> _commandHandlers = new Dictionary<Type, Func<Actor, Command<T>, IEnumerable<Event>>>();
@@ -21,23 +21,23 @@ namespace EmbeddedActors
         {
             _type = typeof(T);
 
-            foreach (var method in GetMethods(_type))
+            foreach (MethodInfo method in GetMethods(_type))
                 Register(method);
         }
 
         public static IEnumerable<Event> Dispatch(Actor target, Command<T> command)
         {
-            var handler = _commandHandlers.Find(command.GetType());
+            Func<Actor, Command<T>, IEnumerable<Event>> handler = _commandHandlers.Find(command.GetType());
 
             if (handler != null)
-                return (IEnumerable<Event>)handler(target, command);
+                return handler(target, command);
 
             throw new InvalidOperationException($"Handler for {command} is not registered for {_type}");
         }
 
         public static void Dispatch(Actor target, Event evt)
         {
-            var handler = _eventHandlers.Find(evt.GetType());
+            Action<Actor, Event> handler = _eventHandlers.Find(evt.GetType());
 
             if (handler != null)
             {
@@ -51,11 +51,11 @@ namespace EmbeddedActors
 
         public static Task<U> Dispatch<U>(Actor target, Query<T, U> query)
         {
-            var handler = _queryHandlers.Find(query.GetType());
+            Func<Actor, Query<T, object>, object> handler = _queryHandlers.Find(query.GetType());
 
             if (handler != null)
             {
-                Query<T,object> q = query as Query<T, object>;
+                Query<T, object> q = query as Query<T, object>;
 
                 return (Task<U>)handler(target, q);
             }
@@ -65,12 +65,11 @@ namespace EmbeddedActors
 
         public static void Register(MethodInfo method)
         {
-            
-            var message = method.GetParameters()[0].ParameterType;
+            Type message = method.GetParameters()[0].ParameterType;
 
-            var interfaces = message.GetTypeInfo().ImplementedInterfaces;
+            IEnumerable<Type> interfaces = message.GetTypeInfo().ImplementedInterfaces;
 
-            if(interfaces.Any(x => x.IsConstructedGenericType && x.GetGenericTypeDefinition() == typeof(Command<>) && x.GenericTypeArguments.First() == typeof(T)))
+            if (interfaces.Any(x => x.IsConstructedGenericType && x.GetGenericTypeDefinition() == typeof(Command<>) && x.GenericTypeArguments.First() == typeof(T)))
             {
                 _commandHandlers.Add(message, MethodToCommmandHandler(method));
             }
@@ -90,50 +89,44 @@ namespace EmbeddedActors
 
         static Func<Actor, Command<T>, IEnumerable<Event>> MethodToCommmandHandler(MethodInfo method)
         {
-            //Debug.Assert(method.DeclaringType != null);
+            ParameterExpression target = Expression.Parameter(typeof(object));
+            ParameterExpression request = Expression.Parameter(typeof(object));
 
-            var target = Expression.Parameter(typeof(object));
-            var request = Expression.Parameter(typeof(object));
+            UnaryExpression targetConversion = Expression.Convert(target, method.DeclaringType);
+            UnaryExpression requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
 
-            var targetConversion = Expression.Convert(target, method.DeclaringType);
-            var requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
+            MethodCallExpression call = Expression.Call(targetConversion, method, requestConversion);
+            Func<Actor, Command<T>, IEnumerable<Event>> func = Expression.Lambda<Func<Actor, Command<T>, IEnumerable<Event>>>(call, target, request).Compile();
 
-            var call = Expression.Call(targetConversion, method, requestConversion);
-            var func = Expression.Lambda<Func<Actor, Command<T>, IEnumerable<Event>>>(call, target, request).Compile();
-            
             return (t, r) => func(t, r);
         }
 
-        static Func<Actor, Query<T,object>, object> MethodToQueryHandler(MethodInfo method)
+        static Func<Actor, Query<T, object>, object> MethodToQueryHandler(MethodInfo method)
         {
-            //Debug.Assert(method.DeclaringType != null);
+            ParameterExpression target = Expression.Parameter(typeof(object));
+            ParameterExpression request = Expression.Parameter(typeof(object));
 
-            var target = Expression.Parameter(typeof(object));
-            var request = Expression.Parameter(typeof(object));
+            UnaryExpression targetConversion = Expression.Convert(target, method.DeclaringType);
+            UnaryExpression requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
 
-            var targetConversion = Expression.Convert(target, method.DeclaringType);
-            var requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
-
-            var call = Expression.Call(targetConversion, method, requestConversion);
-            var func = Expression.Lambda<Func<Actor, Query<T, object>, object>>(call, target, request).Compile();
+            MethodCallExpression call = Expression.Call(targetConversion, method, requestConversion);
+            Func<Actor, Query<T, object>, object> func = Expression.Lambda<Func<Actor, Query<T, object>, object>>(call, target, request).Compile();
 
             return (t, r) => func(t, r);
         }
 
         static Action<Actor, Event> MethodToEventHandler(MethodInfo method)
         {
-            //Debug.Assert(method.DeclaringType != null);
+            ParameterExpression target = Expression.Parameter(typeof(object));
+            ParameterExpression request = Expression.Parameter(typeof(object));
 
-            var target = Expression.Parameter(typeof(object));
-            var request = Expression.Parameter(typeof(object));
+            UnaryExpression targetConversion = Expression.Convert(target, method.DeclaringType);
+            UnaryExpression requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
 
-            var targetConversion = Expression.Convert(target, method.DeclaringType);
-            var requestConversion = Expression.Convert(request, method.GetParameters()[0].ParameterType);
+            MethodCallExpression call = Expression.Call(targetConversion, method, requestConversion);
+            Action<Actor, Event> func = Expression.Lambda<Action<Actor, Event>>(call, target, request).Compile();
 
-            var call = Expression.Call(targetConversion, method, requestConversion);
-            var func = Expression.Lambda<Action<Actor, Event>>(call, target, request).Compile();
-
-            return (t,r) => func(t,r);
+            return (t, r) => func(t, r);
         }
 
         static IEnumerable<MethodInfo> GetMethods(Type actor)
@@ -142,8 +135,8 @@ namespace EmbeddedActors
             {
                 if (actor == typeof(Actor))
                     yield break;
-                
-                var methods = actor
+
+                IEnumerable<MethodInfo> methods = actor
                     .GetRuntimeMethods()
                     .Where(m =>
                             m.GetParameters().Length == 1 &&
@@ -152,7 +145,7 @@ namespace EmbeddedActors
                             !m.IsGenericMethod && !m.ContainsGenericParameters &&
                             conventions.Contains(m.Name));
 
-                foreach (var method in methods)
+                foreach (MethodInfo method in methods)
                     yield return method;
 
                 actor = actor.GetTypeInfo().BaseType;

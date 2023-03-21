@@ -20,7 +20,7 @@ namespace EmbeddedActors
             }
             else
             {
-                var aref = new ActorRef<T>(id);
+                ActorRef<T> aref = new ActorRef<T>(id);
                 _cachedActors[typeof(T)].Add(id, aref);
                 return aref;
             }
